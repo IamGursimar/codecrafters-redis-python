@@ -1,4 +1,6 @@
+import argparse
 import socket
+import sys
 import threading
 
 storage_dict = {}
@@ -47,8 +49,10 @@ def handle_conn(conn):
 
 
 def main():
-
-    server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
+    parser = argparse.ArgumentParser(description="redis app")
+    parser.add_argument("--port", action="store", dest="port", default=6379)
+    args = parser.parse_args()
+    server_socket = socket.create_server(("localhost", int(args.port)), reuse_port=True)
     while True:
         conn, _ = server_socket.accept()  # wait for client
         threading.Thread(target=handle_conn, args=(conn,)).start()

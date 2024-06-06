@@ -4,6 +4,10 @@ import threading
 storage_dict = {}
 
 
+def delete_key(delete_key: str):
+    del storage_dict[delete_key]
+
+
 def handle_conn(conn):
     with conn:
         while True:
@@ -21,11 +25,23 @@ def handle_conn(conn):
                 response = f"+{data[4]}\r\n"
                 conn.send(response.encode())
             elif data[2].lower() == "set":
-                storage_dict[data[4]] = data[6]
+                key = data[4]
+                storage_dict[key] = data[6]
+                if len(data) > 8:
+                    if data[8].lower() == "px":
+                        delete_timer = data[10]
+                        threading.Timer(
+                            interval=float(delete_timer) / 1000.0,
+                            function=delete_key,
+                            args=[key],
+                        ).start()
                 conn.send(b"+OK\r\n")
             elif data[2].lower() == "get":
-                return_value = storage_dict[data[4]]
-                conn.send(f"${len(return_value)}\r\n{return_value}\r\n".encode())
+                if data[4].lower() in storage_dict:
+                    return_value = storage_dict[data[4]]
+                    conn.send(f"${len(return_value)}\r\n{return_value}\r\n".encode())
+                else:
+                    conn.send(b"$-1\r\n")
             # else:
             #     conn.send(response)
 

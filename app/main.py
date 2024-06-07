@@ -23,6 +23,10 @@ def handle_conn(conn):
             # ["*2", "$4", "ECHO", "$6", "orange", ""]
             if data[2].lower() == "ping":
                 conn.send(b"+PONG\r\n")
+            elif data[2].lower() == "info":
+                if data[4].lower() == "replication":
+                    conn.send("$11\r\nrole:master\r\n".encode())
+                    pass
             elif data[2].lower() == "echo":
                 response = f"+{data[4]}\r\n"
                 conn.send(response.encode())

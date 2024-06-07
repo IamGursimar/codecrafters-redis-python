@@ -28,7 +28,9 @@ def handle_conn(conn, is_replica):
                     if is_replica:
                         conn.send("$10\r\nrole:slave\r\n".encode())
                     else:
-                        conn.send("$11\r\nrole:master\r\n".encode())
+                        response_string = "role:master\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0"
+                        length_of_str = len(response_string)
+                        conn.send(f"${length_of_str}\r\n{response_string}\r\n".encode())
             elif data[2].lower() == "echo":
                 response = f"+{data[4]}\r\n"
                 conn.send(response.encode())

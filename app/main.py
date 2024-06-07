@@ -10,7 +10,7 @@ def delete_key(delete_key: str):
     del storage_dict[delete_key]
 
 
-def handle_conn(conn):
+def handle_conn(conn, is_replica):
     with conn:
         while True:
             data = conn.recv(1024).decode()
@@ -25,8 +25,10 @@ def handle_conn(conn):
                 conn.send(b"+PONG\r\n")
             elif data[2].lower() == "info":
                 if data[4].lower() == "replication":
-                    conn.send("$11\r\nrole:master\r\n".encode())
-                    pass
+                    if is_replica:
+                        conn.send("$10\r\nrole:slave\r\n".encode())
+                    else:
+                        conn.send("$11\r\nrole:master\r\n".encode())
             elif data[2].lower() == "echo":
                 response = f"+{data[4]}\r\n"
                 conn.send(response.encode())
@@ -55,11 +57,14 @@ def handle_conn(conn):
 def main():
     parser = argparse.ArgumentParser(description="redis app")
     parser.add_argument("--port", action="store", dest="port", default=6379)
+    parser.add_argument("--replicaof", action="store", dest="replicaof")
     args = parser.parse_args()
     server_socket = socket.create_server(("localhost", int(args.port)), reuse_port=True)
     while True:
         conn, _ = server_socket.accept()  # wait for client
-        threading.Thread(target=handle_conn, args=(conn,)).start()
+        threading.Thread(
+            target=handle_conn, args=(conn, True if args.replicaof else False)
+        ).start()
 
 
 if __name__ == "__main__":

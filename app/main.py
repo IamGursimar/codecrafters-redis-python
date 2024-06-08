@@ -62,6 +62,15 @@ def main():
     parser.add_argument("--replicaof", action="store", dest="replicaof")
     args = parser.parse_args()
     server_socket = socket.create_server(("localhost", int(args.port)), reuse_port=True)
+    # TODO: Need to create a handshake between master and slave.
+
+    if args.replicaof:
+        main_string_array = args.replicaof.split(" ")
+        main_host = main_string_array[0]
+        main_port = main_string_array[1]
+        simple_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        simple_socket.connect((main_host, int(main_port)))
+        simple_socket.send("*1\r\n$4\r\nPING\r\n".encode())
     while True:
         conn, _ = server_socket.accept()  # wait for client
         threading.Thread(

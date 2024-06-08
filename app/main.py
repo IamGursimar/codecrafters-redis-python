@@ -6,6 +6,22 @@ import threading
 storage_dict = {}
 
 
+def main_handshake(main_host: str, main_port: int, replica_port: int):
+
+    simple_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    simple_socket.connect((main_host, int(main_port)))
+    PING = "*1\r\n$4\r\nPING\r\n"
+    simple_socket.send(PING.encode())
+    if "PONG" in simple_socket.recv(1024).decode():
+        simple_socket.send(
+            f"*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{replica_port}\r\n".encode()
+        )
+    if "OK" in simple_socket.recv(1024).decode():
+        simple_socket.send(
+            "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n".encode()
+        )
+
+
 def delete_key(delete_key: str):
     del storage_dict[delete_key]
 
@@ -62,15 +78,16 @@ def main():
     parser.add_argument("--replicaof", action="store", dest="replicaof")
     args = parser.parse_args()
     server_socket = socket.create_server(("localhost", int(args.port)), reuse_port=True)
-    # TODO: Need to create a handshake between master and slave.
 
+    # NOTE: Using Main instead of Master as I prefer this.
     if args.replicaof:
         main_string_array = args.replicaof.split(" ")
-        main_host = main_string_array[0]
-        main_port = main_string_array[1]
-        simple_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        simple_socket.connect((main_host, int(main_port)))
-        simple_socket.send("*1\r\n$4\r\nPING\r\n".encode())
+        main_handshake(
+            main_host=main_string_array[0],
+            main_port=int(main_string_array[1]),
+            replica_port=args.port,
+        )
+
     while True:
         conn, _ = server_socket.accept()  # wait for client
         threading.Thread(

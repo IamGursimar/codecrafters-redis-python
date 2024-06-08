@@ -7,19 +7,31 @@ storage_dict = {}
 
 
 def main_handshake(main_host: str, main_port: int, replica_port: int):
+    # *3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n
 
     simple_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     simple_socket.connect((main_host, int(main_port)))
     PING = "*1\r\n$4\r\nPING\r\n"
     simple_socket.send(PING.encode())
-    if "PONG" in simple_socket.recv(1024).decode():
-        simple_socket.send(
-            f"*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{replica_port}\r\n".encode()
-        )
-    if "OK" in simple_socket.recv(1024).decode():
-        simple_socket.send(
-            "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n".encode()
-        )
+
+    if not "PONG" in simple_socket.recv(1024).decode():
+        raise Exception("Failed handshake")
+
+    # The REPLCONF command is used to configure replication.
+    simple_socket.send(
+        f"*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{replica_port}\r\n".encode()
+    )
+
+    if not "OK" in simple_socket.recv(1024).decode():
+        raise Exception("Failed handshake")
+
+    simple_socket.send(
+        "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n".encode()
+    )
+    if not "OK" in simple_socket.recv(1024).decode():
+        raise Exception("Failed handshake")
+    # The PSYNC command is used to synchronize the state of the replica with the master
+    simple_socket.send("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n".encode())
 
 
 def delete_key(delete_key: str):

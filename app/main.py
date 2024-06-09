@@ -7,6 +7,7 @@ storage_dict = {}
 
 
 def main_handshake(main_host: str, main_port: int, replica_port: int):
+    """Replica sending command to main for connection."""
     # *3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n
 
     simple_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -44,14 +45,19 @@ def handle_conn(conn, is_replica):
             data = conn.recv(1024).decode()
             if not data:
                 break
+
             # "*1\r\n$4\r\nPING"
             # response = b"+PONG\r\n"
             data = data.split("\r\n")
+            command = data[2].lower()
             # Order is as follows * number of strings, $ len of things for each.
             # ["*2", "$4", "ECHO", "$6", "orange", ""]
-            if data[2].lower() == "ping":
+            if command == "ping":
                 conn.send(b"+PONG\r\n")
-            elif data[2].lower() == "info":
+            elif command == "replconf":
+                conn.send("+OK\r\n".encode())
+
+            elif command == "info":
                 if data[4].lower() == "replication":
                     if is_replica:
                         conn.send("$10\r\nrole:slave\r\n".encode())
@@ -59,10 +65,10 @@ def handle_conn(conn, is_replica):
                         response_string = "role:master\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0"
                         length_of_str = len(response_string)
                         conn.send(f"${length_of_str}\r\n{response_string}\r\n".encode())
-            elif data[2].lower() == "echo":
+            elif command == "echo":
                 response = f"+{data[4]}\r\n"
                 conn.send(response.encode())
-            elif data[2].lower() == "set":
+            elif command == "set":
                 key = data[4]
                 storage_dict[key] = data[6]
                 if len(data) > 8:
@@ -74,7 +80,7 @@ def handle_conn(conn, is_replica):
                             args=[key],
                         ).start()
                 conn.send(b"+OK\r\n")
-            elif data[2].lower() == "get":
+            elif command == "get":
                 if data[4].lower() in storage_dict:
                     return_value = storage_dict[data[4]]
                     conn.send(f"${len(return_value)}\r\n{return_value}\r\n".encode())

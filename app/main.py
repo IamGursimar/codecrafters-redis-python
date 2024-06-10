@@ -6,6 +6,7 @@ import threading
 
 storage_dict = {}
 replication_id = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
+replica_list = []
 
 
 def main_handshake(main_host: str, main_port: int, replica_port: int):
@@ -69,6 +70,7 @@ def handle_conn(conn, is_replica):
                 # empty_rdb = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2"
                 len_empty_rdb = len(empty_rdb_bytes)
                 conn.send(f"${len_empty_rdb}\r\n".encode() + empty_rdb_bytes)
+                replica_list.append(conn)
 
             elif command == "info":
                 if data[4].lower() == "replication":
@@ -93,6 +95,9 @@ def handle_conn(conn, is_replica):
                             args=[key],
                         ).start()
                 conn.send(b"+OK\r\n")
+                for replica in replica_list:
+                    replica.send("\r\n".join(data).encode())
+
             elif command == "get":
                 if data[4].lower() in storage_dict:
                     return_value = storage_dict[data[4]]

@@ -57,6 +57,12 @@ def handle_conn(conn, is_replica):
             elif command == "replconf":
                 conn.send("+OK\r\n".encode())
 
+            elif command == "psync":
+                # NOTE: responding with replication id and offset (same as info command.)
+                conn.send(
+                    "+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n".encode()
+                )
+
             elif command == "info":
                 if data[4].lower() == "replication":
                     if is_replica:

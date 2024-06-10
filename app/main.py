@@ -1,14 +1,15 @@
 import argparse
+import base64
 import socket
 import sys
 import threading
 
 storage_dict = {}
+replication_id = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
 
 
 def main_handshake(main_host: str, main_port: int, replica_port: int):
     """Replica sending command to main for connection."""
-    # *3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n
 
     simple_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     simple_socket.connect((main_host, int(main_port)))
@@ -32,6 +33,7 @@ def main_handshake(main_host: str, main_port: int, replica_port: int):
     if not "OK" in simple_socket.recv(1024).decode():
         raise Exception("Failed handshake")
     # The PSYNC command is used to synchronize the state of the replica with the master
+    # ? and -1 means # This is the replica's way of telling the master that it doesn't have any data yet, and needs to be fully resynchronized.
     simple_socket.send("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n".encode())
 
 
@@ -59,16 +61,21 @@ def handle_conn(conn, is_replica):
 
             elif command == "psync":
                 # NOTE: responding with replication id and offset (same as info command.)
-                conn.send(
-                    "+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n".encode()
-                )
+                conn.send(f"+FULLRESYNC {replication_id} 0\r\n".encode())
+                # NOTE: Sending empty rdb file.
+                empty_rdb_base_64 = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==".encode()
+                empty_rdb_bytes = base64.decodebytes(empty_rdb_base_64)
+
+                # empty_rdb = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2"
+                len_empty_rdb = len(empty_rdb_bytes)
+                conn.send(f"${len_empty_rdb}\r\n".encode() + empty_rdb_bytes)
 
             elif command == "info":
                 if data[4].lower() == "replication":
                     if is_replica:
                         conn.send("$10\r\nrole:slave\r\n".encode())
                     else:
-                        response_string = "role:master\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0"
+                        response_string = f"role:master\r\nmaster_replid:{replication_id}\r\nmaster_repl_offset:0"
                         length_of_str = len(response_string)
                         conn.send(f"${length_of_str}\r\n{response_string}\r\n".encode())
             elif command == "echo":
